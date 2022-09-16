@@ -208,6 +208,63 @@ describe("LPStaking", function () {
       expect(await lpStaking.connect(addr2).calculatePendingRewards(addr2.address)).to.be.equal(totalRewards3);
 
     });
+   
+    it("Rewards should be calculated right in various cases - 3 users deposit alternatingly and changing reward per block", async function() {
+      expect((await lpStaking.connect(owner).userStakes(owner.address)).toString()).to.be.equal('0,0,0');
+      let depositBlockNumber = await ethers.provider.getBlockNumber();
+      await expect(lpStaking.connect(owner).deposit(10)).to.emit(lpStaking, "Deposit").withArgs(owner.address, 10, 0);
+
+      await mineNBlocks(10);
+
+      let rewards1 = 10*100;
+      expect(await lpStaking.connect(owner).calculatePendingRewards(owner.address)).to.be.equal(rewards1);
+
+      await expect(lpStaking.connect(addr1).deposit(90)).to.emit(lpStaking, "Deposit").withArgs(addr1.address, 90, 0);
+
+      await mineNBlocks(100);
+
+      let rewards2 = 100*10;
+      let rewardsAddr1 = rewards2*9;
+      let totalRewards = rewards1 + rewards2 + 100;
+      expect(await lpStaking.connect(owner).calculatePendingRewards(owner.address)).to.be.equal(totalRewards);
+      expect(await lpStaking.connect(addr1).calculatePendingRewards(addr1.address)).to.be.equal(rewardsAddr1);
+
+      await expect(lpStaking.connect(addr2).deposit(100)).to.emit(lpStaking, "Deposit").withArgs(addr2.address, 100, 0);
+
+      await expect(lpStaking.connect(owner).updateRewardPerBlock(300)).to.emit(lpStaking, "NewRewardPerBlock").withArgs(300);
+
+      await mineNBlocks(200);
+      let rewards3 = 200*15+5;
+      let rewardsAddr1_2 = rewards3*9;
+      let rewardsAddr2 = rewards3*10;
+      totalRewards += rewards3 + 10;
+      let totalRewards2 = rewardsAddr1_2 + rewardsAddr1 + 90;
+      expect(await lpStaking.connect(owner).calculatePendingRewards(owner.address)).to.be.equal(totalRewards);
+      expect(await lpStaking.connect(addr1).calculatePendingRewards(addr1.address)).to.be.equal(totalRewards2);
+      expect(await lpStaking.connect(addr2).calculatePendingRewards(addr2.address)).to.be.equal(rewardsAddr2);
+
+      await expect(lpStaking.connect(owner).deposit(200)).to.emit(lpStaking, "Deposit").withArgs(owner.address, 200, totalRewards+15);
+
+      await mineNBlocks(10);
+      let rewards4 = 10*300*210/400;
+      let rewardsAddr1_3 = 10*300*90/400;
+      let rewardsAddr2_2 = 10*300*100/400;
+      totalRewards += rewards4 + 15;
+      totalRewards2 += rewardsAddr1_3 + 135;
+      let totalRewards3 = rewardsAddr2 + rewardsAddr2_2 + 150;
+
+      expect(await lpStaking.connect(owner).calculatePendingRewards(owner.address)).to.be.equal(totalRewards);
+      expect(await lpStaking.connect(addr1).calculatePendingRewards(addr1.address)).to.be.equal(totalRewards2);
+      expect(await lpStaking.connect(addr2).calculatePendingRewards(addr2.address)).to.be.equal(totalRewards3);
+
+      await mineNBlocks(1);
+      await expect(lpStaking.connect(owner).collectRewards()).to.emit(lpStaking, "RewardsCollected").withArgs(owner.address, totalRewards+315);
+      await mineNBlocks(1);
+      await expect(lpStaking.connect(addr1).collectRewards()).to.emit(lpStaking, "RewardsCollected").withArgs(addr1.address, totalRewards2+270);
+      await mineNBlocks(1);
+      await expect(lpStaking.connect(addr2).collectRewards()).to.emit(lpStaking, "RewardsCollected").withArgs(addr2.address, totalRewards3+450);
+
+    });
 
     it("Rewards should be collected right", async function() {
       expect((await lpStaking.connect(owner).userStakes(owner.address)).toString()).to.be.equal('0,0,0');
