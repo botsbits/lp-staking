@@ -42,7 +42,7 @@ contract LPStaking is Ownable, Pausable, ReentrancyGuard {
     // Stakes for users that stake tokens (stakedToken)
     mapping(address => Stake) public userStakes;
 
-    event AdminRewardWithdraw(uint256 amount);
+    event AdminWithdraw(uint256 amount);
     event Deposit(address indexed user, uint256 amount, uint256 uncollectedRewardAdded);
     event EmergencyWithdraw(address indexed user, uint256 amount);
     event RewardsCollected(address indexed user, uint256 collectedAmount);
@@ -105,7 +105,7 @@ contract LPStaking is Ownable, Pausable, ReentrancyGuard {
         emit Deposit(msg.sender, amount, pendingRewards);
     }
 
-    function collectRewards() external nonReentrant {
+    function collectRewards() external nonReentrant whenNotPaused {
         _updatePool();
 
         uint newAmount = (userStakes[msg.sender].amount * accTokenPerShare) / PRECISION_FACTOR;
@@ -145,7 +145,7 @@ contract LPStaking is Ownable, Pausable, ReentrancyGuard {
      * @notice Withdraw staked tokens
      * @param amount amount to withdraw (in stakedToken)
      */
-    function withdraw(uint256 amount) external nonReentrant {
+    function withdraw(uint256 amount) external nonReentrant whenNotPaused {
         uint stakedAmount = userStakes[msg.sender].amount;
 
         require(
@@ -177,8 +177,20 @@ contract LPStaking is Ownable, Pausable, ReentrancyGuard {
     function adminRewardWithdraw(uint256 amount) external onlyOwner {
         BITS_TOKEN.safeTransfer(msg.sender, amount);
 
-        emit AdminRewardWithdraw(amount);
+        emit AdminWithdraw(amount);
     }
+
+        /**
+     * @notice Emergency Withdraw (for admin)
+     * @param amount amount to withdraw (in BITS_TOKEN)
+     * @dev Only callable by owner.
+     */
+    function adminEmergencyWithdraw(uint256 amount) external onlyOwner {
+        STAKED_TOKEN.safeTransfer(msg.sender, amount);
+
+        emit AdminWithdraw(amount);
+    }
+
 
     /**
      * @notice Pause
